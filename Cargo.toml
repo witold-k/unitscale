@@ -8,7 +8,3 @@ edition = "2024"
 [dependencies]
 num-traits = "0.2.19"
 
-# my stuff -------------------------------------------------------------------
-# struct_extractors = { version = "0.1.0", path = "../struct_extractors" }
-struct_extractors = { version = "0.1.0", git = "https://github.com/witold-k/struct_extractors", rev = "8e769e7ee7dfbf447ef5e3a768bd6b666d09334b" }
-

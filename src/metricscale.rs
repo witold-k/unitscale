@@ -1,68 +1,797 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Witold Kaminski
 
-use crate::*;
-
-impl MetricScaleID {
-    #[inline(always)]
-    pub fn factor(&self) -> f64 {
-        match self {
-            MetricScaleID::Quetta => 1e30,
-            MetricScaleID::Ronna  => 1e27,
-            MetricScaleID::Yotta  => 1e24,
-            MetricScaleID::Zetta  => 1e21,
-            MetricScaleID::Exa    => 1e18,
-            MetricScaleID::Peta   => 1e15,
-            MetricScaleID::Tera   => 1e12,
-            MetricScaleID::Giga   => 1e9,
-            MetricScaleID::Mega   => 1e6,
-            MetricScaleID::Kilo   => 1e3,
-            MetricScaleID::Hecto  => 1e2,
-            MetricScaleID::Deca   => 1e1,
-            MetricScaleID::One    => 1.0,
-            MetricScaleID::Deci   => 1e-1,
-            MetricScaleID::Centi  => 1e-2,
-            MetricScaleID::Milli  => 1e-3,
-            MetricScaleID::Micro  => 1e-6,
-            MetricScaleID::Nano   => 1e-9,
-            MetricScaleID::Pico   => 1e-12,
-            MetricScaleID::Femto  => 1e-15,
-            MetricScaleID::Atto   => 1e-18,
-            MetricScaleID::Zepto  => 1e-21,
-            MetricScaleID::Yokto  => 1e-24,
-            MetricScaleID::Ronto  => 1e-27,
-            MetricScaleID::Quekto => 1e-30,
-        }
-    }
+pub trait MetricScale: Copy + Clone + Default + 'static {
+    const EXPONENT: i8;
+    const FACTOR: f64;
+    const SYMBOL: &'static str;
 }
 
-impl MetricScale for Mega  {
-    const ID: MetricScaleID = MetricScaleID::Mega;
-    const FACTOR: f64 = 1e6;
+pub trait ScaleMul<Rhs: MetricScale>: MetricScale {
+    type Output: MetricScale;
 }
 
-impl MetricScale for Kilo  {
-    const ID: MetricScaleID = MetricScaleID::Kilo;
-    const FACTOR: f64 = 1e3;
+pub trait ScaleDiv<Rhs: MetricScale>: MetricScale {
+    type Output: MetricScale;
 }
 
-impl MetricScale for Hecto {
-    const ID: MetricScaleID = MetricScaleID::Hecto;
-    const FACTOR: f64 = 1e2;
+macro_rules! metric_scales {
+    ($(($name:ident, $exp:expr, $factor:expr, $symbol:expr)),+ $(,)?) => {
+        $(
+            #[derive(Copy, Clone, Debug, Default)]
+            pub struct $name;
+
+            impl MetricScale for $name {
+                const EXPONENT: i8 = $exp;
+                const FACTOR: f64 = $factor;
+                const SYMBOL: &'static str = $symbol;
+            }
+        )+
+    };
 }
 
-impl MetricScale for Deca  {
-    const ID: MetricScaleID = MetricScaleID::Deca;
-    const FACTOR: f64 = 1e1;
+metric_scales!(
+    (Quetta, 30, 1e30, "Q"),
+    (Ronna, 27, 1e27, "R"),
+    (Yotta, 24, 1e24, "Y"),
+    (Zetta, 21, 1e21, "Z"),
+    (Exa, 18, 1e18, "E"),
+    (Peta, 15, 1e15, "P"),
+    (Tera, 12, 1e12, "T"),
+    (Giga, 9, 1e9, "G"),
+    (Mega, 6, 1e6, "M"),
+    (Kilo, 3, 1e3, "k"),
+    (Hecto, 2, 1e2, "h"),
+    (Deca, 1, 1e1, "da"),
+    (One, 0, 1.0, ""),
+    (Deci, -1, 1e-1, "d"),
+    (Centi, -2, 1e-2, "c"),
+    (Milli, -3, 1e-3, "m"),
+    (Micro, -6, 1e-6, "µ"),
+    (Nano, -9, 1e-9, "n"),
+    (Pico, -12, 1e-12, "p"),
+    (Femto, -15, 1e-15, "f"),
+    (Atto, -18, 1e-18, "a"),
+    (Zepto, -21, 1e-21, "z"),
+    (Yokto, -24, 1e-24, "y"),
+    (Ronto, -27, 1e-27, "r"),
+    (Quekto, -30, 1e-30, "q"),
+);
+
+macro_rules! scale_mul {
+    ($lhs:ty, $rhs:ty => $out:ty) => {
+        impl ScaleMul<$rhs> for $lhs { type Output = $out; }
+    };
 }
 
-impl MetricScale for One   {
-    const ID: MetricScaleID = MetricScaleID::One;
-    const FACTOR: f64 = 1e0;
+macro_rules! scale_div {
+    ($lhs:ty, $rhs:ty => $out:ty) => {
+        impl ScaleDiv<$rhs> for $lhs { type Output = $out; }
+    };
 }
 
-impl MetricScale for Milli {
-    const ID: MetricScaleID = MetricScaleID::Milli;
-    const FACTOR: f64 = 1e-3;
-}
+// Complete algebra for every pair whose resulting decimal exponent is an SI prefix.
+// Combinations without an official SI-prefix result intentionally have no trait implementation.
+scale_mul!(Quetta, One => Quetta);
+scale_mul!(Quetta, Milli => Ronna);
+scale_mul!(Quetta, Micro => Yotta);
+scale_mul!(Quetta, Nano => Zetta);
+scale_mul!(Quetta, Pico => Exa);
+scale_mul!(Quetta, Femto => Peta);
+scale_mul!(Quetta, Atto => Tera);
+scale_mul!(Quetta, Zepto => Giga);
+scale_mul!(Quetta, Yokto => Mega);
+scale_mul!(Quetta, Ronto => Kilo);
+scale_mul!(Quetta, Quekto => One);
+scale_mul!(Ronna, Kilo => Quetta);
+scale_mul!(Ronna, One => Ronna);
+scale_mul!(Ronna, Milli => Yotta);
+scale_mul!(Ronna, Micro => Zetta);
+scale_mul!(Ronna, Nano => Exa);
+scale_mul!(Ronna, Pico => Peta);
+scale_mul!(Ronna, Femto => Tera);
+scale_mul!(Ronna, Atto => Giga);
+scale_mul!(Ronna, Zepto => Mega);
+scale_mul!(Ronna, Yokto => Kilo);
+scale_mul!(Ronna, Ronto => One);
+scale_mul!(Ronna, Quekto => Milli);
+scale_mul!(Yotta, Mega => Quetta);
+scale_mul!(Yotta, Kilo => Ronna);
+scale_mul!(Yotta, One => Yotta);
+scale_mul!(Yotta, Milli => Zetta);
+scale_mul!(Yotta, Micro => Exa);
+scale_mul!(Yotta, Nano => Peta);
+scale_mul!(Yotta, Pico => Tera);
+scale_mul!(Yotta, Femto => Giga);
+scale_mul!(Yotta, Atto => Mega);
+scale_mul!(Yotta, Zepto => Kilo);
+scale_mul!(Yotta, Yokto => One);
+scale_mul!(Yotta, Ronto => Milli);
+scale_mul!(Yotta, Quekto => Micro);
+scale_mul!(Zetta, Giga => Quetta);
+scale_mul!(Zetta, Mega => Ronna);
+scale_mul!(Zetta, Kilo => Yotta);
+scale_mul!(Zetta, One => Zetta);
+scale_mul!(Zetta, Milli => Exa);
+scale_mul!(Zetta, Micro => Peta);
+scale_mul!(Zetta, Nano => Tera);
+scale_mul!(Zetta, Pico => Giga);
+scale_mul!(Zetta, Femto => Mega);
+scale_mul!(Zetta, Atto => Kilo);
+scale_mul!(Zetta, Zepto => One);
+scale_mul!(Zetta, Yokto => Milli);
+scale_mul!(Zetta, Ronto => Micro);
+scale_mul!(Zetta, Quekto => Nano);
+scale_mul!(Exa, Tera => Quetta);
+scale_mul!(Exa, Giga => Ronna);
+scale_mul!(Exa, Mega => Yotta);
+scale_mul!(Exa, Kilo => Zetta);
+scale_mul!(Exa, One => Exa);
+scale_mul!(Exa, Milli => Peta);
+scale_mul!(Exa, Micro => Tera);
+scale_mul!(Exa, Nano => Giga);
+scale_mul!(Exa, Pico => Mega);
+scale_mul!(Exa, Femto => Kilo);
+scale_mul!(Exa, Atto => One);
+scale_mul!(Exa, Zepto => Milli);
+scale_mul!(Exa, Yokto => Micro);
+scale_mul!(Exa, Ronto => Nano);
+scale_mul!(Exa, Quekto => Pico);
+scale_mul!(Peta, Peta => Quetta);
+scale_mul!(Peta, Tera => Ronna);
+scale_mul!(Peta, Giga => Yotta);
+scale_mul!(Peta, Mega => Zetta);
+scale_mul!(Peta, Kilo => Exa);
+scale_mul!(Peta, One => Peta);
+scale_mul!(Peta, Milli => Tera);
+scale_mul!(Peta, Micro => Giga);
+scale_mul!(Peta, Nano => Mega);
+scale_mul!(Peta, Pico => Kilo);
+scale_mul!(Peta, Femto => One);
+scale_mul!(Peta, Atto => Milli);
+scale_mul!(Peta, Zepto => Micro);
+scale_mul!(Peta, Yokto => Nano);
+scale_mul!(Peta, Ronto => Pico);
+scale_mul!(Peta, Quekto => Femto);
+scale_mul!(Tera, Exa => Quetta);
+scale_mul!(Tera, Peta => Ronna);
+scale_mul!(Tera, Tera => Yotta);
+scale_mul!(Tera, Giga => Zetta);
+scale_mul!(Tera, Mega => Exa);
+scale_mul!(Tera, Kilo => Peta);
+scale_mul!(Tera, One => Tera);
+scale_mul!(Tera, Milli => Giga);
+scale_mul!(Tera, Micro => Mega);
+scale_mul!(Tera, Nano => Kilo);
+scale_mul!(Tera, Pico => One);
+scale_mul!(Tera, Femto => Milli);
+scale_mul!(Tera, Atto => Micro);
+scale_mul!(Tera, Zepto => Nano);
+scale_mul!(Tera, Yokto => Pico);
+scale_mul!(Tera, Ronto => Femto);
+scale_mul!(Tera, Quekto => Atto);
+scale_mul!(Giga, Zetta => Quetta);
+scale_mul!(Giga, Exa => Ronna);
+scale_mul!(Giga, Peta => Yotta);
+scale_mul!(Giga, Tera => Zetta);
+scale_mul!(Giga, Giga => Exa);
+scale_mul!(Giga, Mega => Peta);
+scale_mul!(Giga, Kilo => Tera);
+scale_mul!(Giga, One => Giga);
+scale_mul!(Giga, Milli => Mega);
+scale_mul!(Giga, Micro => Kilo);
+scale_mul!(Giga, Nano => One);
+scale_mul!(Giga, Pico => Milli);
+scale_mul!(Giga, Femto => Micro);
+scale_mul!(Giga, Atto => Nano);
+scale_mul!(Giga, Zepto => Pico);
+scale_mul!(Giga, Yokto => Femto);
+scale_mul!(Giga, Ronto => Atto);
+scale_mul!(Giga, Quekto => Zepto);
+scale_mul!(Mega, Yotta => Quetta);
+scale_mul!(Mega, Zetta => Ronna);
+scale_mul!(Mega, Exa => Yotta);
+scale_mul!(Mega, Peta => Zetta);
+scale_mul!(Mega, Tera => Exa);
+scale_mul!(Mega, Giga => Peta);
+scale_mul!(Mega, Mega => Tera);
+scale_mul!(Mega, Kilo => Giga);
+scale_mul!(Mega, One => Mega);
+scale_mul!(Mega, Milli => Kilo);
+scale_mul!(Mega, Micro => One);
+scale_mul!(Mega, Nano => Milli);
+scale_mul!(Mega, Pico => Micro);
+scale_mul!(Mega, Femto => Nano);
+scale_mul!(Mega, Atto => Pico);
+scale_mul!(Mega, Zepto => Femto);
+scale_mul!(Mega, Yokto => Atto);
+scale_mul!(Mega, Ronto => Zepto);
+scale_mul!(Mega, Quekto => Yokto);
+scale_mul!(Kilo, Ronna => Quetta);
+scale_mul!(Kilo, Yotta => Ronna);
+scale_mul!(Kilo, Zetta => Yotta);
+scale_mul!(Kilo, Exa => Zetta);
+scale_mul!(Kilo, Peta => Exa);
+scale_mul!(Kilo, Tera => Peta);
+scale_mul!(Kilo, Giga => Tera);
+scale_mul!(Kilo, Mega => Giga);
+scale_mul!(Kilo, Kilo => Mega);
+scale_mul!(Kilo, One => Kilo);
+scale_mul!(Kilo, Deci => Hecto);
+scale_mul!(Kilo, Centi => Deca);
+scale_mul!(Kilo, Milli => One);
+scale_mul!(Kilo, Micro => Milli);
+scale_mul!(Kilo, Nano => Micro);
+scale_mul!(Kilo, Pico => Nano);
+scale_mul!(Kilo, Femto => Pico);
+scale_mul!(Kilo, Atto => Femto);
+scale_mul!(Kilo, Zepto => Atto);
+scale_mul!(Kilo, Yokto => Zepto);
+scale_mul!(Kilo, Ronto => Yokto);
+scale_mul!(Kilo, Quekto => Ronto);
+scale_mul!(Hecto, Deca => Kilo);
+scale_mul!(Hecto, One => Hecto);
+scale_mul!(Hecto, Deci => Deca);
+scale_mul!(Hecto, Centi => One);
+scale_mul!(Hecto, Milli => Deci);
+scale_mul!(Deca, Hecto => Kilo);
+scale_mul!(Deca, Deca => Hecto);
+scale_mul!(Deca, One => Deca);
+scale_mul!(Deca, Deci => One);
+scale_mul!(Deca, Centi => Deci);
+scale_mul!(Deca, Milli => Centi);
+scale_mul!(One, Quetta => Quetta);
+scale_mul!(One, Ronna => Ronna);
+scale_mul!(One, Yotta => Yotta);
+scale_mul!(One, Zetta => Zetta);
+scale_mul!(One, Exa => Exa);
+scale_mul!(One, Peta => Peta);
+scale_mul!(One, Tera => Tera);
+scale_mul!(One, Giga => Giga);
+scale_mul!(One, Mega => Mega);
+scale_mul!(One, Kilo => Kilo);
+scale_mul!(One, Hecto => Hecto);
+scale_mul!(One, Deca => Deca);
+scale_mul!(One, One => One);
+scale_mul!(One, Deci => Deci);
+scale_mul!(One, Centi => Centi);
+scale_mul!(One, Milli => Milli);
+scale_mul!(One, Micro => Micro);
+scale_mul!(One, Nano => Nano);
+scale_mul!(One, Pico => Pico);
+scale_mul!(One, Femto => Femto);
+scale_mul!(One, Atto => Atto);
+scale_mul!(One, Zepto => Zepto);
+scale_mul!(One, Yokto => Yokto);
+scale_mul!(One, Ronto => Ronto);
+scale_mul!(One, Quekto => Quekto);
+scale_mul!(Deci, Kilo => Hecto);
+scale_mul!(Deci, Hecto => Deca);
+scale_mul!(Deci, Deca => One);
+scale_mul!(Deci, One => Deci);
+scale_mul!(Deci, Deci => Centi);
+scale_mul!(Deci, Centi => Milli);
+scale_mul!(Centi, Kilo => Deca);
+scale_mul!(Centi, Hecto => One);
+scale_mul!(Centi, Deca => Deci);
+scale_mul!(Centi, One => Centi);
+scale_mul!(Centi, Deci => Milli);
+scale_mul!(Milli, Quetta => Ronna);
+scale_mul!(Milli, Ronna => Yotta);
+scale_mul!(Milli, Yotta => Zetta);
+scale_mul!(Milli, Zetta => Exa);
+scale_mul!(Milli, Exa => Peta);
+scale_mul!(Milli, Peta => Tera);
+scale_mul!(Milli, Tera => Giga);
+scale_mul!(Milli, Giga => Mega);
+scale_mul!(Milli, Mega => Kilo);
+scale_mul!(Milli, Kilo => One);
+scale_mul!(Milli, Hecto => Deci);
+scale_mul!(Milli, Deca => Centi);
+scale_mul!(Milli, One => Milli);
+scale_mul!(Milli, Milli => Micro);
+scale_mul!(Milli, Micro => Nano);
+scale_mul!(Milli, Nano => Pico);
+scale_mul!(Milli, Pico => Femto);
+scale_mul!(Milli, Femto => Atto);
+scale_mul!(Milli, Atto => Zepto);
+scale_mul!(Milli, Zepto => Yokto);
+scale_mul!(Milli, Yokto => Ronto);
+scale_mul!(Milli, Ronto => Quekto);
+scale_mul!(Micro, Quetta => Yotta);
+scale_mul!(Micro, Ronna => Zetta);
+scale_mul!(Micro, Yotta => Exa);
+scale_mul!(Micro, Zetta => Peta);
+scale_mul!(Micro, Exa => Tera);
+scale_mul!(Micro, Peta => Giga);
+scale_mul!(Micro, Tera => Mega);
+scale_mul!(Micro, Giga => Kilo);
+scale_mul!(Micro, Mega => One);
+scale_mul!(Micro, Kilo => Milli);
+scale_mul!(Micro, One => Micro);
+scale_mul!(Micro, Milli => Nano);
+scale_mul!(Micro, Micro => Pico);
+scale_mul!(Micro, Nano => Femto);
+scale_mul!(Micro, Pico => Atto);
+scale_mul!(Micro, Femto => Zepto);
+scale_mul!(Micro, Atto => Yokto);
+scale_mul!(Micro, Zepto => Ronto);
+scale_mul!(Micro, Yokto => Quekto);
+scale_mul!(Nano, Quetta => Zetta);
+scale_mul!(Nano, Ronna => Exa);
+scale_mul!(Nano, Yotta => Peta);
+scale_mul!(Nano, Zetta => Tera);
+scale_mul!(Nano, Exa => Giga);
+scale_mul!(Nano, Peta => Mega);
+scale_mul!(Nano, Tera => Kilo);
+scale_mul!(Nano, Giga => One);
+scale_mul!(Nano, Mega => Milli);
+scale_mul!(Nano, Kilo => Micro);
+scale_mul!(Nano, One => Nano);
+scale_mul!(Nano, Milli => Pico);
+scale_mul!(Nano, Micro => Femto);
+scale_mul!(Nano, Nano => Atto);
+scale_mul!(Nano, Pico => Zepto);
+scale_mul!(Nano, Femto => Yokto);
+scale_mul!(Nano, Atto => Ronto);
+scale_mul!(Nano, Zepto => Quekto);
+scale_mul!(Pico, Quetta => Exa);
+scale_mul!(Pico, Ronna => Peta);
+scale_mul!(Pico, Yotta => Tera);
+scale_mul!(Pico, Zetta => Giga);
+scale_mul!(Pico, Exa => Mega);
+scale_mul!(Pico, Peta => Kilo);
+scale_mul!(Pico, Tera => One);
+scale_mul!(Pico, Giga => Milli);
+scale_mul!(Pico, Mega => Micro);
+scale_mul!(Pico, Kilo => Nano);
+scale_mul!(Pico, One => Pico);
+scale_mul!(Pico, Milli => Femto);
+scale_mul!(Pico, Micro => Atto);
+scale_mul!(Pico, Nano => Zepto);
+scale_mul!(Pico, Pico => Yokto);
+scale_mul!(Pico, Femto => Ronto);
+scale_mul!(Pico, Atto => Quekto);
+scale_mul!(Femto, Quetta => Peta);
+scale_mul!(Femto, Ronna => Tera);
+scale_mul!(Femto, Yotta => Giga);
+scale_mul!(Femto, Zetta => Mega);
+scale_mul!(Femto, Exa => Kilo);
+scale_mul!(Femto, Peta => One);
+scale_mul!(Femto, Tera => Milli);
+scale_mul!(Femto, Giga => Micro);
+scale_mul!(Femto, Mega => Nano);
+scale_mul!(Femto, Kilo => Pico);
+scale_mul!(Femto, One => Femto);
+scale_mul!(Femto, Milli => Atto);
+scale_mul!(Femto, Micro => Zepto);
+scale_mul!(Femto, Nano => Yokto);
+scale_mul!(Femto, Pico => Ronto);
+scale_mul!(Femto, Femto => Quekto);
+scale_mul!(Atto, Quetta => Tera);
+scale_mul!(Atto, Ronna => Giga);
+scale_mul!(Atto, Yotta => Mega);
+scale_mul!(Atto, Zetta => Kilo);
+scale_mul!(Atto, Exa => One);
+scale_mul!(Atto, Peta => Milli);
+scale_mul!(Atto, Tera => Micro);
+scale_mul!(Atto, Giga => Nano);
+scale_mul!(Atto, Mega => Pico);
+scale_mul!(Atto, Kilo => Femto);
+scale_mul!(Atto, One => Atto);
+scale_mul!(Atto, Milli => Zepto);
+scale_mul!(Atto, Micro => Yokto);
+scale_mul!(Atto, Nano => Ronto);
+scale_mul!(Atto, Pico => Quekto);
+scale_mul!(Zepto, Quetta => Giga);
+scale_mul!(Zepto, Ronna => Mega);
+scale_mul!(Zepto, Yotta => Kilo);
+scale_mul!(Zepto, Zetta => One);
+scale_mul!(Zepto, Exa => Milli);
+scale_mul!(Zepto, Peta => Micro);
+scale_mul!(Zepto, Tera => Nano);
+scale_mul!(Zepto, Giga => Pico);
+scale_mul!(Zepto, Mega => Femto);
+scale_mul!(Zepto, Kilo => Atto);
+scale_mul!(Zepto, One => Zepto);
+scale_mul!(Zepto, Milli => Yokto);
+scale_mul!(Zepto, Micro => Ronto);
+scale_mul!(Zepto, Nano => Quekto);
+scale_mul!(Yokto, Quetta => Mega);
+scale_mul!(Yokto, Ronna => Kilo);
+scale_mul!(Yokto, Yotta => One);
+scale_mul!(Yokto, Zetta => Milli);
+scale_mul!(Yokto, Exa => Micro);
+scale_mul!(Yokto, Peta => Nano);
+scale_mul!(Yokto, Tera => Pico);
+scale_mul!(Yokto, Giga => Femto);
+scale_mul!(Yokto, Mega => Atto);
+scale_mul!(Yokto, Kilo => Zepto);
+scale_mul!(Yokto, One => Yokto);
+scale_mul!(Yokto, Milli => Ronto);
+scale_mul!(Yokto, Micro => Quekto);
+scale_mul!(Ronto, Quetta => Kilo);
+scale_mul!(Ronto, Ronna => One);
+scale_mul!(Ronto, Yotta => Milli);
+scale_mul!(Ronto, Zetta => Micro);
+scale_mul!(Ronto, Exa => Nano);
+scale_mul!(Ronto, Peta => Pico);
+scale_mul!(Ronto, Tera => Femto);
+scale_mul!(Ronto, Giga => Atto);
+scale_mul!(Ronto, Mega => Zepto);
+scale_mul!(Ronto, Kilo => Yokto);
+scale_mul!(Ronto, One => Ronto);
+scale_mul!(Ronto, Milli => Quekto);
+scale_mul!(Quekto, Quetta => One);
+scale_mul!(Quekto, Ronna => Milli);
+scale_mul!(Quekto, Yotta => Micro);
+scale_mul!(Quekto, Zetta => Nano);
+scale_mul!(Quekto, Exa => Pico);
+scale_mul!(Quekto, Peta => Femto);
+scale_mul!(Quekto, Tera => Atto);
+scale_mul!(Quekto, Giga => Zepto);
+scale_mul!(Quekto, Mega => Yokto);
+scale_mul!(Quekto, Kilo => Ronto);
+scale_mul!(Quekto, One => Quekto);
 
+scale_div!(Quetta, Quetta => One);
+scale_div!(Quetta, Ronna => Kilo);
+scale_div!(Quetta, Yotta => Mega);
+scale_div!(Quetta, Zetta => Giga);
+scale_div!(Quetta, Exa => Tera);
+scale_div!(Quetta, Peta => Peta);
+scale_div!(Quetta, Tera => Exa);
+scale_div!(Quetta, Giga => Zetta);
+scale_div!(Quetta, Mega => Yotta);
+scale_div!(Quetta, Kilo => Ronna);
+scale_div!(Quetta, One => Quetta);
+scale_div!(Ronna, Quetta => Milli);
+scale_div!(Ronna, Ronna => One);
+scale_div!(Ronna, Yotta => Kilo);
+scale_div!(Ronna, Zetta => Mega);
+scale_div!(Ronna, Exa => Giga);
+scale_div!(Ronna, Peta => Tera);
+scale_div!(Ronna, Tera => Peta);
+scale_div!(Ronna, Giga => Exa);
+scale_div!(Ronna, Mega => Zetta);
+scale_div!(Ronna, Kilo => Yotta);
+scale_div!(Ronna, One => Ronna);
+scale_div!(Ronna, Milli => Quetta);
+scale_div!(Yotta, Quetta => Micro);
+scale_div!(Yotta, Ronna => Milli);
+scale_div!(Yotta, Yotta => One);
+scale_div!(Yotta, Zetta => Kilo);
+scale_div!(Yotta, Exa => Mega);
+scale_div!(Yotta, Peta => Giga);
+scale_div!(Yotta, Tera => Tera);
+scale_div!(Yotta, Giga => Peta);
+scale_div!(Yotta, Mega => Exa);
+scale_div!(Yotta, Kilo => Zetta);
+scale_div!(Yotta, One => Yotta);
+scale_div!(Yotta, Milli => Ronna);
+scale_div!(Yotta, Micro => Quetta);
+scale_div!(Zetta, Quetta => Nano);
+scale_div!(Zetta, Ronna => Micro);
+scale_div!(Zetta, Yotta => Milli);
+scale_div!(Zetta, Zetta => One);
+scale_div!(Zetta, Exa => Kilo);
+scale_div!(Zetta, Peta => Mega);
+scale_div!(Zetta, Tera => Giga);
+scale_div!(Zetta, Giga => Tera);
+scale_div!(Zetta, Mega => Peta);
+scale_div!(Zetta, Kilo => Exa);
+scale_div!(Zetta, One => Zetta);
+scale_div!(Zetta, Milli => Yotta);
+scale_div!(Zetta, Micro => Ronna);
+scale_div!(Zetta, Nano => Quetta);
+scale_div!(Exa, Quetta => Pico);
+scale_div!(Exa, Ronna => Nano);
+scale_div!(Exa, Yotta => Micro);
+scale_div!(Exa, Zetta => Milli);
+scale_div!(Exa, Exa => One);
+scale_div!(Exa, Peta => Kilo);
+scale_div!(Exa, Tera => Mega);
+scale_div!(Exa, Giga => Giga);
+scale_div!(Exa, Mega => Tera);
+scale_div!(Exa, Kilo => Peta);
+scale_div!(Exa, One => Exa);
+scale_div!(Exa, Milli => Zetta);
+scale_div!(Exa, Micro => Yotta);
+scale_div!(Exa, Nano => Ronna);
+scale_div!(Exa, Pico => Quetta);
+scale_div!(Peta, Quetta => Femto);
+scale_div!(Peta, Ronna => Pico);
+scale_div!(Peta, Yotta => Nano);
+scale_div!(Peta, Zetta => Micro);
+scale_div!(Peta, Exa => Milli);
+scale_div!(Peta, Peta => One);
+scale_div!(Peta, Tera => Kilo);
+scale_div!(Peta, Giga => Mega);
+scale_div!(Peta, Mega => Giga);
+scale_div!(Peta, Kilo => Tera);
+scale_div!(Peta, One => Peta);
+scale_div!(Peta, Milli => Exa);
+scale_div!(Peta, Micro => Zetta);
+scale_div!(Peta, Nano => Yotta);
+scale_div!(Peta, Pico => Ronna);
+scale_div!(Peta, Femto => Quetta);
+scale_div!(Tera, Quetta => Atto);
+scale_div!(Tera, Ronna => Femto);
+scale_div!(Tera, Yotta => Pico);
+scale_div!(Tera, Zetta => Nano);
+scale_div!(Tera, Exa => Micro);
+scale_div!(Tera, Peta => Milli);
+scale_div!(Tera, Tera => One);
+scale_div!(Tera, Giga => Kilo);
+scale_div!(Tera, Mega => Mega);
+scale_div!(Tera, Kilo => Giga);
+scale_div!(Tera, One => Tera);
+scale_div!(Tera, Milli => Peta);
+scale_div!(Tera, Micro => Exa);
+scale_div!(Tera, Nano => Zetta);
+scale_div!(Tera, Pico => Yotta);
+scale_div!(Tera, Femto => Ronna);
+scale_div!(Tera, Atto => Quetta);
+scale_div!(Giga, Quetta => Zepto);
+scale_div!(Giga, Ronna => Atto);
+scale_div!(Giga, Yotta => Femto);
+scale_div!(Giga, Zetta => Pico);
+scale_div!(Giga, Exa => Nano);
+scale_div!(Giga, Peta => Micro);
+scale_div!(Giga, Tera => Milli);
+scale_div!(Giga, Giga => One);
+scale_div!(Giga, Mega => Kilo);
+scale_div!(Giga, Kilo => Mega);
+scale_div!(Giga, One => Giga);
+scale_div!(Giga, Milli => Tera);
+scale_div!(Giga, Micro => Peta);
+scale_div!(Giga, Nano => Exa);
+scale_div!(Giga, Pico => Zetta);
+scale_div!(Giga, Femto => Yotta);
+scale_div!(Giga, Atto => Ronna);
+scale_div!(Giga, Zepto => Quetta);
+scale_div!(Mega, Quetta => Yokto);
+scale_div!(Mega, Ronna => Zepto);
+scale_div!(Mega, Yotta => Atto);
+scale_div!(Mega, Zetta => Femto);
+scale_div!(Mega, Exa => Pico);
+scale_div!(Mega, Peta => Nano);
+scale_div!(Mega, Tera => Micro);
+scale_div!(Mega, Giga => Milli);
+scale_div!(Mega, Mega => One);
+scale_div!(Mega, Kilo => Kilo);
+scale_div!(Mega, One => Mega);
+scale_div!(Mega, Milli => Giga);
+scale_div!(Mega, Micro => Tera);
+scale_div!(Mega, Nano => Peta);
+scale_div!(Mega, Pico => Exa);
+scale_div!(Mega, Femto => Zetta);
+scale_div!(Mega, Atto => Yotta);
+scale_div!(Mega, Zepto => Ronna);
+scale_div!(Mega, Yokto => Quetta);
+scale_div!(Kilo, Quetta => Ronto);
+scale_div!(Kilo, Ronna => Yokto);
+scale_div!(Kilo, Yotta => Zepto);
+scale_div!(Kilo, Zetta => Atto);
+scale_div!(Kilo, Exa => Femto);
+scale_div!(Kilo, Peta => Pico);
+scale_div!(Kilo, Tera => Nano);
+scale_div!(Kilo, Giga => Micro);
+scale_div!(Kilo, Mega => Milli);
+scale_div!(Kilo, Kilo => One);
+scale_div!(Kilo, Hecto => Deca);
+scale_div!(Kilo, Deca => Hecto);
+scale_div!(Kilo, One => Kilo);
+scale_div!(Kilo, Milli => Mega);
+scale_div!(Kilo, Micro => Giga);
+scale_div!(Kilo, Nano => Tera);
+scale_div!(Kilo, Pico => Peta);
+scale_div!(Kilo, Femto => Exa);
+scale_div!(Kilo, Atto => Zetta);
+scale_div!(Kilo, Zepto => Yotta);
+scale_div!(Kilo, Yokto => Ronna);
+scale_div!(Kilo, Ronto => Quetta);
+scale_div!(Hecto, Kilo => Deci);
+scale_div!(Hecto, Hecto => One);
+scale_div!(Hecto, Deca => Deca);
+scale_div!(Hecto, One => Hecto);
+scale_div!(Hecto, Deci => Kilo);
+scale_div!(Deca, Kilo => Centi);
+scale_div!(Deca, Hecto => Deci);
+scale_div!(Deca, Deca => One);
+scale_div!(Deca, One => Deca);
+scale_div!(Deca, Deci => Hecto);
+scale_div!(Deca, Centi => Kilo);
+scale_div!(One, Quetta => Quekto);
+scale_div!(One, Ronna => Ronto);
+scale_div!(One, Yotta => Yokto);
+scale_div!(One, Zetta => Zepto);
+scale_div!(One, Exa => Atto);
+scale_div!(One, Peta => Femto);
+scale_div!(One, Tera => Pico);
+scale_div!(One, Giga => Nano);
+scale_div!(One, Mega => Micro);
+scale_div!(One, Kilo => Milli);
+scale_div!(One, Hecto => Centi);
+scale_div!(One, Deca => Deci);
+scale_div!(One, One => One);
+scale_div!(One, Deci => Deca);
+scale_div!(One, Centi => Hecto);
+scale_div!(One, Milli => Kilo);
+scale_div!(One, Micro => Mega);
+scale_div!(One, Nano => Giga);
+scale_div!(One, Pico => Tera);
+scale_div!(One, Femto => Peta);
+scale_div!(One, Atto => Exa);
+scale_div!(One, Zepto => Zetta);
+scale_div!(One, Yokto => Yotta);
+scale_div!(One, Ronto => Ronna);
+scale_div!(One, Quekto => Quetta);
+scale_div!(Deci, Hecto => Milli);
+scale_div!(Deci, Deca => Centi);
+scale_div!(Deci, One => Deci);
+scale_div!(Deci, Deci => One);
+scale_div!(Deci, Centi => Deca);
+scale_div!(Deci, Milli => Hecto);
+scale_div!(Centi, Deca => Milli);
+scale_div!(Centi, One => Centi);
+scale_div!(Centi, Deci => Deci);
+scale_div!(Centi, Centi => One);
+scale_div!(Centi, Milli => Deca);
+scale_div!(Milli, Ronna => Quekto);
+scale_div!(Milli, Yotta => Ronto);
+scale_div!(Milli, Zetta => Yokto);
+scale_div!(Milli, Exa => Zepto);
+scale_div!(Milli, Peta => Atto);
+scale_div!(Milli, Tera => Femto);
+scale_div!(Milli, Giga => Pico);
+scale_div!(Milli, Mega => Nano);
+scale_div!(Milli, Kilo => Micro);
+scale_div!(Milli, One => Milli);
+scale_div!(Milli, Deci => Centi);
+scale_div!(Milli, Centi => Deci);
+scale_div!(Milli, Milli => One);
+scale_div!(Milli, Micro => Kilo);
+scale_div!(Milli, Nano => Mega);
+scale_div!(Milli, Pico => Giga);
+scale_div!(Milli, Femto => Tera);
+scale_div!(Milli, Atto => Peta);
+scale_div!(Milli, Zepto => Exa);
+scale_div!(Milli, Yokto => Zetta);
+scale_div!(Milli, Ronto => Yotta);
+scale_div!(Milli, Quekto => Ronna);
+scale_div!(Micro, Yotta => Quekto);
+scale_div!(Micro, Zetta => Ronto);
+scale_div!(Micro, Exa => Yokto);
+scale_div!(Micro, Peta => Zepto);
+scale_div!(Micro, Tera => Atto);
+scale_div!(Micro, Giga => Femto);
+scale_div!(Micro, Mega => Pico);
+scale_div!(Micro, Kilo => Nano);
+scale_div!(Micro, One => Micro);
+scale_div!(Micro, Milli => Milli);
+scale_div!(Micro, Micro => One);
+scale_div!(Micro, Nano => Kilo);
+scale_div!(Micro, Pico => Mega);
+scale_div!(Micro, Femto => Giga);
+scale_div!(Micro, Atto => Tera);
+scale_div!(Micro, Zepto => Peta);
+scale_div!(Micro, Yokto => Exa);
+scale_div!(Micro, Ronto => Zetta);
+scale_div!(Micro, Quekto => Yotta);
+scale_div!(Nano, Zetta => Quekto);
+scale_div!(Nano, Exa => Ronto);
+scale_div!(Nano, Peta => Yokto);
+scale_div!(Nano, Tera => Zepto);
+scale_div!(Nano, Giga => Atto);
+scale_div!(Nano, Mega => Femto);
+scale_div!(Nano, Kilo => Pico);
+scale_div!(Nano, One => Nano);
+scale_div!(Nano, Milli => Micro);
+scale_div!(Nano, Micro => Milli);
+scale_div!(Nano, Nano => One);
+scale_div!(Nano, Pico => Kilo);
+scale_div!(Nano, Femto => Mega);
+scale_div!(Nano, Atto => Giga);
+scale_div!(Nano, Zepto => Tera);
+scale_div!(Nano, Yokto => Peta);
+scale_div!(Nano, Ronto => Exa);
+scale_div!(Nano, Quekto => Zetta);
+scale_div!(Pico, Exa => Quekto);
+scale_div!(Pico, Peta => Ronto);
+scale_div!(Pico, Tera => Yokto);
+scale_div!(Pico, Giga => Zepto);
+scale_div!(Pico, Mega => Atto);
+scale_div!(Pico, Kilo => Femto);
+scale_div!(Pico, One => Pico);
+scale_div!(Pico, Milli => Nano);
+scale_div!(Pico, Micro => Micro);
+scale_div!(Pico, Nano => Milli);
+scale_div!(Pico, Pico => One);
+scale_div!(Pico, Femto => Kilo);
+scale_div!(Pico, Atto => Mega);
+scale_div!(Pico, Zepto => Giga);
+scale_div!(Pico, Yokto => Tera);
+scale_div!(Pico, Ronto => Peta);
+scale_div!(Pico, Quekto => Exa);
+scale_div!(Femto, Peta => Quekto);
+scale_div!(Femto, Tera => Ronto);
+scale_div!(Femto, Giga => Yokto);
+scale_div!(Femto, Mega => Zepto);
+scale_div!(Femto, Kilo => Atto);
+scale_div!(Femto, One => Femto);
+scale_div!(Femto, Milli => Pico);
+scale_div!(Femto, Micro => Nano);
+scale_div!(Femto, Nano => Micro);
+scale_div!(Femto, Pico => Milli);
+scale_div!(Femto, Femto => One);
+scale_div!(Femto, Atto => Kilo);
+scale_div!(Femto, Zepto => Mega);
+scale_div!(Femto, Yokto => Giga);
+scale_div!(Femto, Ronto => Tera);
+scale_div!(Femto, Quekto => Peta);
+scale_div!(Atto, Tera => Quekto);
+scale_div!(Atto, Giga => Ronto);
+scale_div!(Atto, Mega => Yokto);
+scale_div!(Atto, Kilo => Zepto);
+scale_div!(Atto, One => Atto);
+scale_div!(Atto, Milli => Femto);
+scale_div!(Atto, Micro => Pico);
+scale_div!(Atto, Nano => Nano);
+scale_div!(Atto, Pico => Micro);
+scale_div!(Atto, Femto => Milli);
+scale_div!(Atto, Atto => One);
+scale_div!(Atto, Zepto => Kilo);
+scale_div!(Atto, Yokto => Mega);
+scale_div!(Atto, Ronto => Giga);
+scale_div!(Atto, Quekto => Tera);
+scale_div!(Zepto, Giga => Quekto);
+scale_div!(Zepto, Mega => Ronto);
+scale_div!(Zepto, Kilo => Yokto);
+scale_div!(Zepto, One => Zepto);
+scale_div!(Zepto, Milli => Atto);
+scale_div!(Zepto, Micro => Femto);
+scale_div!(Zepto, Nano => Pico);
+scale_div!(Zepto, Pico => Nano);
+scale_div!(Zepto, Femto => Micro);
+scale_div!(Zepto, Atto => Milli);
+scale_div!(Zepto, Zepto => One);
+scale_div!(Zepto, Yokto => Kilo);
+scale_div!(Zepto, Ronto => Mega);
+scale_div!(Zepto, Quekto => Giga);
+scale_div!(Yokto, Mega => Quekto);
+scale_div!(Yokto, Kilo => Ronto);
+scale_div!(Yokto, One => Yokto);
+scale_div!(Yokto, Milli => Zepto);
+scale_div!(Yokto, Micro => Atto);
+scale_div!(Yokto, Nano => Femto);
+scale_div!(Yokto, Pico => Pico);
+scale_div!(Yokto, Femto => Nano);
+scale_div!(Yokto, Atto => Micro);
+scale_div!(Yokto, Zepto => Milli);
+scale_div!(Yokto, Yokto => One);
+scale_div!(Yokto, Ronto => Kilo);
+scale_div!(Yokto, Quekto => Mega);
+scale_div!(Ronto, Kilo => Quekto);
+scale_div!(Ronto, One => Ronto);
+scale_div!(Ronto, Milli => Yokto);
+scale_div!(Ronto, Micro => Zepto);
+scale_div!(Ronto, Nano => Atto);
+scale_div!(Ronto, Pico => Femto);
+scale_div!(Ronto, Femto => Pico);
+scale_div!(Ronto, Atto => Nano);
+scale_div!(Ronto, Zepto => Micro);
+scale_div!(Ronto, Yokto => Milli);
+scale_div!(Ronto, Ronto => One);
+scale_div!(Ronto, Quekto => Kilo);
+scale_div!(Quekto, One => Quekto);
+scale_div!(Quekto, Milli => Ronto);
+scale_div!(Quekto, Micro => Yokto);
+scale_div!(Quekto, Nano => Zepto);
+scale_div!(Quekto, Pico => Atto);
+scale_div!(Quekto, Femto => Femto);
+scale_div!(Quekto, Atto => Pico);
+scale_div!(Quekto, Zepto => Nano);
+scale_div!(Quekto, Yokto => Micro);
+scale_div!(Quekto, Ronto => Milli);
+scale_div!(Quekto, Quekto => One);
