@@ -12,6 +12,9 @@ use crate::metricscale::{MetricScale, One, ScaleDiv, ScaleMul};
 
 /// A floating-point value tagged with an SI decimal scale.
 ///
+/// The scale describes only a decimal representation factor such as `Kilo` or
+/// `Mega`. It does not describe a physical unit or dimension.
+///
 /// The scale is type-level metadata and occupies no runtime storage.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -95,6 +98,10 @@ where
     }
 }
 
+/// Multiplies the stored values and combines only their decimal scales.
+///
+/// For example, `Mega * Kilo -> Giga`. This operation carries no physical
+/// dimensional semantics.
 impl<T, L, R> Mul<FloatMetric<T, R>> for FloatMetric<T, L>
 where
     T: Float,
@@ -109,6 +116,10 @@ where
     }
 }
 
+/// Divides the stored values and subtracts only their decimal scale exponents.
+///
+/// For example, `Giga / Mega -> Kilo`. This operation carries no physical
+/// dimensional semantics.
 impl<T, L, R> Div<FloatMetric<T, R>> for FloatMetric<T, L>
 where
     T: Float,

@@ -2,7 +2,7 @@
 
 `unitscale` is a small Rust library for zero-overhead numeric wrappers with compile-time scale information.
 
-It models SI decimal scale prefixes and angles without becoming a physical dimensional-analysis framework.
+It models SI decimal scale prefixes and angles. It deliberately does not model physical units or dimensions.
 
 ## Metric scaling
 
@@ -21,7 +21,7 @@ All current SI decimal prefixes from `Quetta` (`10^30`) through `Quekto` (`10^-3
 
 ## Scale algebra
 
-Multiplication and division combine the decimal exponents of their scales at compile time:
+Multiplication and division combine the decimal exponents of their scales at compile time. They operate on numeric scaling only: `Mega * Kilo -> Giga` means `10^6 * 10^3 -> 10^9`; it does **not** imply any physical-unit or dimensional algebra:
 
 ```rust
 use unitscale::{FloatMetric, Giga, Kilo, Mega, One};
@@ -43,6 +43,8 @@ Thus `Mega * Kilo -> Giga`, `Kilo * Kilo -> Mega`, and `Giga / Mega -> Kilo`.
 Only results that correspond to a defined SI decimal prefix are implemented. For example, `Hecto * Kilo` would produce `10^5`, for which SI defines no prefix, so that expression fails at compile time instead of inventing a runtime scale.
 
 Addition and subtraction require identical scale types. Values with different scales can be converted explicitly before adding or subtracting them.
+
+Changing the representation of an operand can therefore change the scale type of the result while preserving its numeric meaning. For example, the same multiplication may be represented as `6 Giga` or `6000 Mega`. Explicit conversion can normalize the result when a particular scale is required.
 
 ## Angles
 
@@ -87,4 +89,4 @@ CI additionally checks formatting, all targets, tests, and Clippy with warnings 
 
 ## Status
 
-The crate is still in its draft/redesign phase. The current API establishes the intended abstraction boundary before downstream code starts depending on it.
+The crate intentionally stays small: compile-time decimal scaling plus angle representation, without physical-unit or dimensional analysis.

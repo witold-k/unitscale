@@ -45,9 +45,9 @@ fn division_combines_metric_scales() {
     let kilo: FloatMetric<f64, Kilo> = giga / mega;
     assert_eq!(kilo.raw_value(), 4.0);
 
-    let dimensionless: FloatMetric<f64, One> =
+    let unscaled: FloatMetric<f64, One> =
         FloatMetric::<f64, Mega>::new(8.0) / FloatMetric::<f64, Mega>::new(4.0);
-    assert_eq!(dimensionless.raw_value(), 2.0);
+    assert_eq!(unscaled.raw_value(), 2.0);
 }
 
 #[test]
@@ -130,4 +130,15 @@ fn scale_algebra_covers_nontrivial_prefix_pairs() {
     let quetta: FloatMetric<f64, Quetta> =
         FloatMetric::<f64, One>::new(8.0) / FloatMetric::<f64, Quekto>::new(2.0);
     assert_eq!(quetta.raw_value(), 4.0);
+}
+
+#[test]
+fn multiplication_is_invariant_under_scale_conversion() {
+    let mega = FloatMetric::<f64, Mega>::new(2.0);
+    let kilo = FloatMetric::<f64, Kilo>::new(3.0);
+
+    let direct: FloatMetric<f64, Giga> = mega * kilo;
+    let converted: FloatMetric<f64, Mega> = mega.to::<Kilo>() * kilo;
+
+    assert_eq!(direct.to::<One>().raw_value(), converted.to::<One>().raw_value());
 }
